@@ -1,0 +1,62 @@
+//
+// Curso de Elementos Finitos con FreeFem++
+// Universidad de Medellin, 13 al 15 de noviembre de 2019
+// Roberto Cabrales
+// Programa para resolver el problema de Poisson en 2D
+// Ultima modificacion: jueves 14 de noviembre de 2019
+//
+
+func Uex=sin(pi*x)*sin(pi*y);
+func f=2*(pi^2)*Uex; 
+//exp(x)* sin(y);
+
+// Creamos el dominio de calculo
+// 1. Circulo
+// real Radio=1;
+//border gamma(t=0, 2*pi) { x=Radio*cos(t); y=Radio*sin(t); }
+
+// 2. Rectangulo
+real Lx=1;
+
+border a(t=0,Lx) {x=t;    y=0;   label=1;};     
+border b(t=0,Lx) {x=Lx;   y=t;   label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Lx;  label=3;};
+border d(t=0,Lx) {x=0;    y=Lx-t;label=4;};
+ 
+plot(a(10)+b(10)+c(10)+d(10),wait=1); 
+
+// Mallado de la geometria
+//mesh Th=square(Nx,Nx);
+int Nx=10; // numero de nodos del borde de la geometria
+mesh Th=buildmesh(a(Nx)+b(Nx)+c(Nx)+d(Nx)); 
+
+plot(Th,wait=1);
+
+// Espacios de elementos finitos usados
+
+fespace Lh(Th,P0);
+Lh hvec=hTriangle;
+real h=hvec[].max; // parametro de la malla
+
+fespace Xh(Th,P1);
+Xh u, v;
+
+// formulacion variacional del problema
+
+problem Poisson2D(u,v) =
+int2d(Th) ( dx(u)* dx(v) + dy(u)* dy(v) )
+- int2d(Th) ( f * v )
++on(1,2,3,4,u=0);
+//+on(a,b,c,d,u=0);
+
+// Solucion del problema 
+
+Poisson2D;
+plot(u,fill=true,value=true);
+
+real error=sqrt(int2d(Th)((Uex-u)^2));
+cout << "Error en norma L2 " << error << "para h " << h << endl;
+//plot(Th);
+
+
+

@@ -1,0 +1,115 @@
+//=======================================================================
+// programa Conveccion Natural usando el metodo de proyeccion
+// Ultima modificacion: Viernes 26 de Julio de 2019. 
+// Roberto Cabrales
+//-----------------------------------------------------------------------
+
+verbosity=0;
+
+load "iovtk" //load library of vtk
+
+int wdateMatlab=0;
+string fileMatlab="CNSquareRa1e6_2019agosto08.m";
+
+int wdateParaview=0;
+string vtkOutputFile="CNSquareRa1e6_2019agosto08";
+string nombredatos="Velocidad Temperatura Presion";
+int isave=0;
+
+real dtguarda=0.5;    // paso de tiempo para guardar las variables
+real tiempo=dtguarda; // parametro auxiliar para guardar las variables
+real dt=0.01, Tf=1.1, invdt=1/dt;
+real TolStop=1e-5;
+
+real Nt=Tf/dt;
+real tpo=0;
+
+real Lx=1;
+int  Nx=51, Ny=Nx;
+
+//=======================================================================
+// constantes fisicas del problema
+//-----------------------------------------------------------------------
+
+real nu=0.00001;
+// Medimos los numeros de Nusselt en la pared izquierda y a la mitad de cavidad
+
+real NuParedIzq;
+real NuMitadCavidad;
+
+//=======================================================================
+// dominio y malla espacial 
+//-----------------------------------------------------------------------
+
+border a(t=0,Lx) {x=t;    y=0;    label=1;};     
+border b(t=0,Lx) {x=Lx;   y=t;    label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Lx;   label=3;};
+border d(t=0,Lx) {x=0;    y=Lx-t; label=4;};
+
+mesh Th=buildmesh(a(Nx)+b(Nx)+c(Nx)+d(Nx)); 
+
+//=======================================================================
+// Espacios de elementos finitos
+//-----------------------------------------------------------------------
+
+fespace Lh(Th, P0);
+Lh hvec=hTriangle;
+real hMalla=hvec[].max; // parametro de la malla
+
+fespace Xh(Th, P1);
+int nph=Xh.ndof;
+Xh gt;
+Xh phi, wt;
+Xh u=cos(0.25*pi);        // velocidad inicial de la aleacion
+Xh v=sin(0.25*pi);        // velocidad inicial de la aleacion
+
+int opcion=3; //1=normal; 2=viscosidad artificial; 3=SUPG
+
+//	Defining the variational problem	
+
+if (opcion==1)
+{
+problem CD (phi,wt,solver=UMFPACK) =
+ int2d(Th)(nu*(dx(phi)*dx(wt)+dy(phi)*dy(wt)))
++int2d(Th)((u*dx(phi)+v*dy(phi))*wt)	
++on(1,phi=0)
++on(2,phi=0)
++on(3,phi=1)
++on(4,phi=1);
+CD;
+}
+else if (opcion==2)
+{
+real Uinf = max(u[].linfty,v[].linfty); //L_infinity norm
+
+problem CDStab(phi,wt,solver=UMFPACK) =
+int2d(Th)(nu*(dx(phi)*dx(wt)+dy(phi)*dy(wt))+(u*dx(phi)+v*dy(phi))*wt)
++int2d(Th)(Uinf*hTriangle*(dx(phi)*dx(wt)+dy(phi)*dy(wt))) 
++on(1,phi=0)
++on(2,phi=0)
++on(3,phi=1)
++on(4,phi=1);
+CDStab;
+}
+else if (opcion==3)
+{
+real delta = 1.0;
+real U2=sqrt(int2d(Th)(u^2+v^2)); // L_2 norm
+Lh tau= hTriangle/U2;
+real Uinf = max(u[].linfty,v[].linfty); //L_infinity norm
+problem CDSUPG(phi,wt,solver=UMFPACK) =
+int2d(Th)(nu*(dx(phi)*dx(wt)+dy(phi)*dy(wt))+(u*dx(phi)+v*dy(phi))*wt)
++int2d(Th)(delta*(-nu*(dxx(phi)+dyy(phi))+u*dx(phi)+v*dy(phi)) //SUPG
+*tau*(u*dx(wt)+v*dy(wt)))
++on(1,phi=0)
++on(2,phi=0)
++on(3,phi=1)
++on(4,phi=1);
+CDSUPG;
+}
+
+
+plot(phi,fill=true,value=true);
+
+
+

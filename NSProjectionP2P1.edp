@@ -1,0 +1,265 @@
+//=======================================================================
+// programa Conveccion Natural usando el metodo de proyeccion
+// Ultima modificacion: Viernes 26 de Julio de 2019. 
+// Roberto Cabrales
+//-----------------------------------------------------------------------
+
+verbosity=0;
+
+load "iovtk" //load library of vtk
+
+int wdateMatlab=0;
+string fileMatlab="NSSquareRa1e6_2019agosto08.m";
+
+int wdateParaview=0;
+string vtkOutputFile="NSSquareRa1e6_2019agosto08";
+string nombredatos="Velocidad Presion";
+int isave=0;
+
+real dtguarda=0.5;    // paso de tiempo para guardar las variables
+real tiempo=dtguarda; // parametro auxiliar para guardar las variables
+real dt=0.01, Tf=1.1, invdt=1/dt;
+real TolStop=1e-5;
+
+real Nt=Tf/dt;
+real tpo=0;
+
+real Lx=1;
+int  Nx=141, Ny=Nx;
+
+//=======================================================================
+// constantes fisicas del problema
+//-----------------------------------------------------------------------
+
+real Re=100;  // numero de Reynolds
+real nu=1/Re;
+real Uinf=1;
+
+//=======================================================================
+// funciones que describen la condicion inicial del sistema
+//-----------------------------------------------------------------------
+
+func uinicial=0;        // velocidad inicial de la aleacion
+func vinicial=0;        // velocidad inicial de la aleacion
+func prinicial=0; // si usamos la expresion del modelo de celantano
+
+//=======================================================================
+// dominio y malla espacial 
+//-----------------------------------------------------------------------
+
+border a(t=0,Lx) {x=t;    y=0;    label=1;};     
+border b(t=0,Lx) {x=Lx;   y=t;    label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Lx;   label=3;};
+border d(t=0,Lx) {x=0;    y=Lx-t; label=4;};
+
+mesh Th=buildmesh(a(Nx)+b(Nx)+c(Nx)+d(Nx)); 
+
+//=======================================================================
+// Espacios de elementos finitos
+//-----------------------------------------------------------------------
+
+fespace Lh(Th, P0);
+Lh hvec=hTriangle;
+real hMalla=hvec[].max; // parametro de la malla
+
+fespace Xh(Th, P1);
+int nph=Xh.ndof;
+Xh gt;
+Xh dpnm1, prnm1, prphi, prn;
+
+fespace Wh(Th, P2);
+Wh ft, f1t, f2t, fx, fy;
+Wh unm1, ugnm1, ugn, un;
+Wh vnm1, vgnm1, vgn, vn;
+//Wh normavel;
+//Wh streamvel;
+
+//=======================================================================
+// Formulacion variacional del problema 
+//-----------------------------------------------------------------------
+// Paso 1 del metodo de la proyeccion 
+//-----------------------------------------------------------------------
+
+
+problem ProyPaso1VelU(ugnm1,ft,solver=UMFPACK)=
+// terminos temporales
+//int2d(Th)(invdt*(ugnm1*ft))-int2d(Th)(invdt*(ugn*ft))
+// terminos convectivos (segun la forma del paper de Codina)
+//+int2d(Th)((un*dx(ugnm1)+vn*dy(ugnm1))*ft)
+//+int2d(Th)((un*dx(ugorro)+vn*dy(ugorro))*ft)
+//+int2d(Th)(0.5*(dx(un)+dy(vn))*ugorro*ft)
+// formulacion usando operador convect
+int2d(Th)(invdt*(ugnm1*ft))-int2d(Th)(invdt*convect([un,vn],-dt,ugn)*ft)
+//+int2d(Th)(nu*dx(ugnm1)*dx(ft)+0.5*nu*(dy(ugnm1)*dy(ft)+dx(ugnm1)*dy(ft)))	// terminos difusivos
++int2d(Th)(2*nu*dx(ugnm1)*dx(ft)+nu*dy(ugnm1)*dy(ft))
++int2d(Th)(nu*dx(vgn)*dy(ft))	// terminos difusivos
+//+int2d(Th)(2*nu*dx(ugnm1)*dx(ft)+nu*dy(ugnm1)*dy(ft)+nu*dx(vgn)*dy(ft))	// terminos difusivos
+//+int2d(Th)(nu*dx(ugnm1)*dx(ft)+nu*dy(ugnm1)*dy(ft)))	// terminos difusivos
+-int2d(Th)(prn*dx(ft))					// termino de la presion
+//-int2d(Th)(fx*vt)// terminos de acoplamiento con la temperatura, en este caso no hay
++on(1,2,4,ugnm1=0)+on(3,ugnm1=Uinf);					// condicion de borde
+
+problem ProyPaso1VelV(vgnm1,ft,solver=UMFPACK)=
+// terminos temporales
+//int2d(Th)(invdt*(vgnm1*ft))-int2d(Th)(invdt*(vgn*ft))
+// terminos convectivos (segun la forma del paper de Codina)
+//+int2d(Th)((un*dx(vgnm1)+vn*dy(vgnm1))*ft)
+//+int2d(Th)((un*dx(vgorro)+vn*dy(vgorro))*ft)
+//+int2d(Th)(0.5*(dx(un)+dy(vn))*vgorro*ft)
+// formulacion usando operador convect
+int2d(Th)(invdt*(vgnm1*ft))-int2d(Th)(invdt*convect([un,vn],-dt,vgn)*ft)
+// terminos difusivos
+//+int2d(Th)(nu*dx(vgnm1)*dx(ft)+0.5*nu*(dy(vgnm1)*dy(ft)+dy(vgnm1)*dx(ft)))
++int2d(Th)(nu*dx(vgnm1)*dx(ft)+2*nu*dy(vgnm1)*dy(ft))
++int2d(Th)(nu*dy(ugnm1)*dx(ft))
+//+int2d(Th)(2*nu*dx(vgnm1)*dx(ft)+nu*(dy(vgnm1)*dy(ft)+dy(ugnm1)*dx(ft)))
+//+int2d(Th)(nu*dx(vgnm1)*dx(ft)+nu*dy(vgnm1)*dy(ft)))	// terminos difusivos
+-int2d(Th)(prn*dy(ft))					// termino de la presion
++on(1,2,3,4,vgnm1=0);					// condicion de borde
+
+//-----------------------------------------------------------------------
+// Paso 2 del metodo de la proyeccion 
+//-----------------------------------------------------------------------
+
+problem ProyPaso2Presion(dpnm1,gt,solver=UMFPACK)=
+int2d(Th)(dx(dpnm1)*dx(gt)+dy(dpnm1)*dy(gt))
++int2d(Th)(invdt*(dx(ugnm1)+dy(vgnm1))*gt);
+
+//-----------------------------------------------------------------------
+// Paso 3 del metodo de la proyeccion 
+//-----------------------------------------------------------------------
+
+problem ProyPaso3VelU(unm1,ft,solver=UMFPACK)=
+int2d(Th)(unm1*ft)-int2d(Th)(ugnm1*ft)+int2d(Th)(dt*dx(dpnm1)*ft)
++on(1,2,4,unm1=0)+on(3,unm1=1);
+
+problem ProyPaso3VelV(vnm1,ft,solver=UMFPACK)=
+int2d(Th)(vnm1*ft)-int2d(Th)(vgnm1*ft)+int2d(Th)(dt*dy(dpnm1)*ft)
++on(1,2,3,4,vnm1=0);
+
+//-----------------------------------------------------------------------
+// Funcion de corriente
+//-----------------------------------------------------------------------
+
+//problem Funcioncorriente(streamvel,ft,solver=UMFPACK)=
+//int2d(Th)(dx(streamvel)*dx(ft)+dy(streamvel)*dy(ft))
+//-int2d(Th)(dx(vnm1)*ft-dy(unm1)*ft)
+//+on(1,2,3,4,streamvel=0);
+//+on(1,2,3,streamvel=0)+on(4,streamvel=y);
+
+//=======================================================================
+// Paso 1 del algoritmo:
+// inicializacion de acuerdo a las condiciones iniciales del problema.
+//-----------------------------------------------------------------------
+
+un=uinicial;
+ugn=un;
+vn=vinicial;
+vgn=vn;
+prn=prinicial;
+
+//-----------------------------------------------------------------------
+// Iteraciones temporales
+// Datos matlab
+int iter=1;
+
+if (wdateMatlab==1)
+{
+// guardamos los numeros de Nusselt
+	{
+	ofstream f(fileMatlab,append);
+	f << "clear \n";
+	f << "h=" << hMalla << "; dt=" << dt << "Nodos=" << Wh.ndof << "; \n";
+	f << "Re=" << Re << "; \n";
+	} 
+}
+//-----------------------------------------------------------------------
+// Datos para paraview
+
+if (wdateParaview==1)
+{
+	cout << "Salvando la condicion inicial en formato vtk..." << endl;
+	savevtk(vtkOutputFile+isave+".vtk",Th,[un,vn,0],prn,dataname=nombredatos);
+};
+
+//-----------------------------------------------------------------------
+// valores de la ley de energia discreta
+
+real Stop=1;
+real Den=1;
+cout << "Numero de nodos velocidad= " << Wh.ndof << endl;
+real demora;
+while (tpo<Tf){//(Stop>TolStop){// 
+
+
+	// Primer paso del algoritmo de la proyeccion
+	cout << "inicio paso 1" << endl;
+	demora=clock();
+	ProyPaso1VelU;
+	//fy=cteBou*tempnm1;
+	ProyPaso1VelV;
+	demora=clock()-demora;
+	cout << "tiempo solucion sistema momentum " << demora << endl;
+
+	// Segundo paso del metodo de proyeccion
+	cout << "inicio paso 2" << endl;
+	ProyPaso2Presion;
+
+	// tercer paso del metodo de proyeccion
+	cout << "inicio paso 3" << endl;
+	ProyPaso3VelU;
+	ProyPaso3VelV;
+
+	// actualizacion
+
+	Stop=sqrt(int2d(Th)((unm1-un)^2+(vnm1-vn)^2));
+	Den=sqrt(int2d(Th)(un^2+vn^2));
+	if (Den>0)
+	{
+		Stop=Stop/Den;
+	}
+
+
+	// actualizacion de variables
+
+	un=unm1;
+	ugn=ugnm1;
+	vn=vnm1;
+	vgn=vgnm1;
+	prn=prnm1+dpnm1;
+
+	//plot(tempn,[un,vn],boundary=0);
+	//plot(streamvel,value=1,boundary=0);
+	//normavel=sqrt(un*un+vn*vn);
+	//plot(prn,[un,vn],value=1,boundary=0);
+	plot(prn,[un,vn],value=1,boundary=0);//,coef=0.1
+	//plot(normavel,fill=true,value=1,boundary=0);
+	tpo=tpo+dt; 
+	iter=iter+1;
+
+	cout << " Time= " << tpo << " Stop= " << Stop << endl;
+	//cout << "       " << "Nusselt Izq= " << NuParedIzq << endl;
+
+	//-----------------------------------------------------------------------
+	// Datos matlab
+
+	if (wdateMatlab==1)
+	{
+	// guardamos los numeros de Nusselt
+	{
+		ofstream f(fileMatlab,append);
+//		f.scientific << "NuParedIzq(" << iter << ")=" << NuParedIzq <<"; \n";
+	} 
+	}
+	if (wdateParaview==1)
+	{
+		if (abs(tiempo-tpo)<1e-5)
+		{
+		cout << "Salvando datos en formato vtk..." << endl;
+		isave=isave+1;
+		savevtk(vtkOutputFile+isave+".vtk",Th,[un,vn,0],prn,dataname=nombredatos);
+		tiempo=tiempo+dtguarda;
+		};
+	};	
+	cout << "Fin iteracion" << endl;
+};

@@ -1,0 +1,72 @@
+//======================================================================
+// programa Difusion-Conveccion 
+// Roberto Cabrales
+//-----------------------------------------------------------------------
+
+verbosity=0;
+
+load "iovtk" //load library of vtk
+
+int wdateParaview=1;
+string vtkOutputFile="ConvDif2D_2019nov19";
+string nombredatos="Velocidad Temperatura";
+
+//=======================================================================
+// datos del problema
+//-----------------------------------------------------------------------
+
+func f=1;
+real nu=0.1;
+
+//=======================================================================
+// dominio y malla espacial 
+//-----------------------------------------------------------------------
+
+real Lx=1;
+int  Nx=51, Ny=Nx;
+
+border a(t=0,Lx) {x=t;    y=0;    label=1;};     
+border b(t=0,Lx) {x=Lx;   y=t;    label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Lx;   label=3;};
+border d(t=0,Lx) {x=0;    y=Lx-t; label=4;};
+
+mesh Th=buildmesh(a(Nx)+b(Nx)+c(Nx)+d(Nx)); 
+
+//=======================================================================
+// Espacios de elementos finitos
+//-----------------------------------------------------------------------
+
+fespace Lh(Th, P0);
+Lh hvec=hTriangle;
+real hMalla=hvec[].max; // parametro de la malla
+
+fespace Xh(Th, P1);
+int nph=Xh.ndof;
+Xh gt;
+Xh phi, wt;
+Xh w1=1;//cos(0.25*pi);
+Xh w2=1;//sin(0.25*pi);    
+
+//	Defining the variational problem	
+
+problem CD (phi,wt,solver=UMFPACK) =
+ int2d(Th)(nu*(dx(phi)*dx(wt)+dy(phi)*dy(wt)))
++int2d(Th)((w1*dx(phi)+w2*dy(phi))*wt)
+-int2d(Th)(f*wt)	
++on(1,phi=0)
++on(2,phi=0)
++on(3,phi=0)
++on(4,phi=0);
+
+CD;
+
+plot(phi,fill=true,value=true);
+
+if (wdateParaview==1)
+{
+	cout << "Salvando datos en formato vtk..." << endl;
+	savevtk(vtkOutputFile+".vtk",Th,[w1,w2,0],phi,dataname=nombredatos);
+};	
+
+
+

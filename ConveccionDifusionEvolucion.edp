@@ -1,0 +1,75 @@
+//======================================================================
+// programa Difusion-Conveccion 
+// Roberto Cabrales
+//-----------------------------------------------------------------------
+
+verbosity=0;
+
+//=======================================================================
+// datos del problema
+//-----------------------------------------------------------------------
+
+real dt=0.01, invdt=1/dt;
+real Tf=1;
+real tpo=0;
+func f=1;
+func uInicial=0;
+real nu=0.1;
+
+//=======================================================================
+// dominio y malla espacial 
+//-----------------------------------------------------------------------
+
+real Lx=1;
+int  Nx=51, Ny=Nx;
+
+border a(t=0,Lx) {x=t;    y=0;    label=1;};     
+border b(t=0,Lx) {x=Lx;   y=t;    label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Lx;   label=3;};
+border d(t=0,Lx) {x=0;    y=Lx-t; label=4;};
+
+mesh Th=buildmesh(a(Nx)+b(Nx)+c(Nx)+d(Nx)); 
+
+//=======================================================================
+// Espacios de elementos finitos
+//-----------------------------------------------------------------------
+
+fespace Lh(Th, P0);
+Lh hvec=hTriangle;
+real hMalla=hvec[].max; // parametro de la malla
+
+fespace Xh(Th, P1);
+int nph=Xh.ndof;
+Xh gt;
+Xh unm1, un, v;
+Xh w1=1;//cos(0.25*pi);
+Xh w2=1;//sin(0.25*pi);    
+
+//	Defining the variational problem	
+
+problem ConvDif (unm1,v,solver=UMFPACK) =
+int2d(Th)(invdt*(unm1*v))-int2d(Th)(invdt*(un*v))
++int2d(Th)(nu*(dx(unm1)*dx(v)+dy(unm1)*dy(v)))
++int2d(Th)((w1*dx(unm1)+w2*dy(unm1))*v)
+-int2d(Th)(f*v)	
++on(1,unm1=0)
++on(2,unm1=0)
++on(3,unm1=0)
++on(4,unm1=0);
+
+// Solucion del problema 
+
+un=uInicial;
+while (tpo<Tf){
+	tpo=tpo+dt;
+	cout << "Tiempo " << tpo << endl;
+	ConvDif;
+	plot(unm1,fill=true,value=true,wait=1);
+	un=unm1;
+}
+
+
+
+
+
+

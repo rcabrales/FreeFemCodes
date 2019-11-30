@@ -1,0 +1,62 @@
+//
+// Curso de Elementos Finitos con FreeFem++
+// Universidad de Medellin, 13 al 15 de noviembre de 2019
+// Roberto Cabrales
+// Programa para resolver el problema de Poisson en 2D
+// Ultima modificacion: jueves 14 de noviembre de 2019
+//
+
+verbosity=0;
+
+real dt=0.1, invdt=1/dt;
+real Tf=1;
+real tpo=0;
+real kappa=0.1;
+func uInicial=10;
+func f=0;
+
+// Creamos el dominio de calculo
+
+real Lx=1, Ly=1;
+
+border a(t=0,Lx) {x=t;    y=0;    label=1;};     
+border b(t=0,Ly) {x=Lx;   y=t;    label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Ly;   label=3;};
+border d(t=0,Ly) {x=0;    y=Ly-t; label=4;};
+ 
+// Mallado de la geometria
+
+int Nx=100, Ny=10; // numero de nodos del borde de la geometria
+mesh Th=buildmesh(a(Nx)+b(Ny)+c(Nx)+d(Ny)); 
+
+// Espacios de elementos finitos usados
+
+fespace Lh(Th,P0);
+Lh hvec=hTriangle;
+real h=hvec[].max; // parametro de la malla
+
+fespace Xh(Th,P1);
+Xh unm1, un, v;
+
+// formulacion variacional del problema
+
+problem Poisson2D(unm1,v) =
+int2d(Th)(invdt*(unm1*v))-int2d(Th)(invdt*(un*v))
++int2d(Th)(kappa*(dx(unm1)* dx(v) + dy(unm1)* dy(v)))
+-int2d(Th)(f*v)
++on(1,2,3,4,unm1=0);
+
+// Solucion del problema 
+
+un=uInicial;
+while (tpo<Tf){
+	tpo=tpo+dt;
+	cout << "Tiempo " << tpo << endl;
+	Poisson2D;
+	plot(unm1,fill=true,value=true,wait=1);
+	un=unm1;
+}
+
+
+
+

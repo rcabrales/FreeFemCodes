@@ -1,0 +1,59 @@
+//======================================================================
+// programa Difusion-Conveccion 
+// Roberto Cabrales
+//-----------------------------------------------------------------------
+
+verbosity=0;
+
+//=======================================================================
+// datos del problema
+//-----------------------------------------------------------------------
+
+func f=1;
+real nu=0.01;
+
+//=======================================================================
+// dominio y malla espacial 
+//-----------------------------------------------------------------------
+
+real Lx=1, Ly=0.1;
+int  Nx=51, Ny=Nx;
+
+border a(t=0,Lx) {x=t;    y=0;    label=1;};     
+border b(t=0,Ly) {x=Lx;   y=t;    label=2;};
+border c(t=0,Lx) {x=Lx-t; y=Ly;   label=3;};
+border d(t=0,Ly) {x=0;    y=Ly-t; label=4;};
+
+mesh Th=buildmesh(a(Nx)+b(Nx)+c(Nx)+d(Nx)); 
+
+//=======================================================================
+// Espacios de elementos finitos
+//-----------------------------------------------------------------------
+
+fespace Lh(Th, P0);
+Lh hvec=hTriangle;
+real hMalla=hvec[].max; // parametro de la malla
+
+fespace Xh(Th, P1);
+int nph=Xh.ndof;
+Xh u, v;
+Xh w1=1;//cos(0.25*pi);
+Xh w2=0;//sin(0.25*pi);    
+
+//	Defining the variational problem	
+
+problem ConvDif (u,v,solver=UMFPACK) =
+ int2d(Th)(nu*(dx(u)*dx(v)))//+dy(u)*dy(v)))
++int2d(Th)((w1*dx(u)+w2*dy(u))*v)
+-int2d(Th)(f*v)	
+//+on(1,u=0)
++on(2,u=0)
+//+on(3,u=0);
++on(4,u=0);
+
+ConvDif;
+
+plot(u,fill=true,value=true);
+
+
+
