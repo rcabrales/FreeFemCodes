@@ -18,7 +18,9 @@ Código análogo al anterior, pero ahora incluyendo la variación de la variable
 - ConveccionDifusionEstacionario.edp: 
 Código que resuelve el problema de convección difusión estacionario en 2D usando elementos finitos P1.
 Escrito para resaltar el problema de estabilidad numérica y la necesidad de usar técnicas
-que tomen cuenta del fenómeno.
+que tomen cuenta del fenómeno. Para ello, se incluye además, el programa difcon1d.m que sirve 
+para ilustrar este problema en 1D. Este programa se puede ejecutar usando Matlab 
+https://la.mathworks.com/ u octave https://www.gnu.org/software/octave/
 
 - ConveccionDifusionEvolucion.edp: 
 Código análogo al anterior, pero ahora incluyendo la variación de la variable con el tiempo.
@@ -39,5 +41,6 @@ ser leído en paraview. http://www.paraview.com
 
 Estos programas tienen el mismo nombre que los códigos anteriores, pero se ha 
 añadido la palabra Paraview al final de su nombre.
+
 
 
